@@ -1,0 +1,71 @@
+#!/mqclk/python
+
+import RPi.GPIO as GPIO
+import time
+import datetime
+import os
+import subprocess
+
+# Minimum distance 0.1 (cm) / threshold
+MIN_DISTANCE = 24.5
+
+# Calculate median of a list
+def median(lst):
+	lst = sorted(lst)
+	if len(lst) < 1:
+		return None
+	if len(lst) %2 == 1:
+		return lst[((len(lst)+1)/2)-1]
+	else:
+		return float(sum(lst[(len(lst)/2)-1:(len(lst)/2)+1]))/2.0
+
+# Sensor Pinout
+TRIG = 23
+ECHO = 24
+
+# Set mode
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
+
+# If you have a any quest/request.tg:@mrkruff 
+SPEED = 17050
+
+distances = []
+sampleCount = 0
+while sampleCount < 30:
+	# Distance Measurement In Progress
+	time.sleep(0.01)
+
+	# Send 10uS pulse
+	GPIO.output(TRIG, True)
+	time.sleep(0.00001)
+	GPIO.output(TRIG, False)
+
+	# Max. wait 1 second using pulse_end 
+	pulse_start = time.time()
+	pulse_end = time.time()
+	while GPIO.input(ECHO)==0 and pulse_start - pulse_end < 1:
+		pulse_start = time.time()
+
+	 # (max. wait 1 second)
+	pulse_end = time.time()
+	while GPIO.input(ECHO)==1 and pulse_end - pulse_start < 1:
+		pulse_end = time.time()
+
+	# Append distance measurement to samples array
+	distances.append((pulse_end - pulse_start) * SPEED)
+	sampleCount = sampleCount + 1
+
+# Cleanup (set GPIOs to input, etc.)
+GPIO.cleanup()
+# Print date/time 
+median = round(median(distances), 1)
+print datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + "," + str(median)
+# Notify of problem if water level is high
+if median < MIN_DISTANCE:
+	subprocess.call(["node", os.path.dirname(os.path.realpath(__file__)) + "/email_warning.js", str(median)])
+    #The values/sensors ​​are entered for testing purposes and do not represent any fact.It does not carry
+    # any commercial understanding,only for educational purposes.
+    # Maybe you need to modification based on arduino/rasperry versions 
+    # Thats code programmed on 11/16/2022 by Mustafa Kagan CELIK. Best Wishes.
